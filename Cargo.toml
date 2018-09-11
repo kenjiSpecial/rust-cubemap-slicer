@@ -1,0 +1,29 @@
+[package]
+name = "glfw-example"
+version = "0.1.0"
+authors = ["Kenji <k.saito.1985@gmail.com>"]
+
+[dependencies]
+gl = "0.10.0"
+glfw = "0.24.0"
+image = "0.19.0"
+cgmath = "0.16.1"
+
+
+[features]
+default = [
+    "chapter-1",
+    "chapter-2",
+    "chapter-3",
+    "chapter-4",
+    "chapter-5",
+    "chapter-6",
+    "chapter-7"
+]
+chapter-1 = []
+chapter-2 = []
+chapter-3 = []
+chapter-4 = []
+chapter-5 = []
+chapter-6 = []
+chapter-7 = []
