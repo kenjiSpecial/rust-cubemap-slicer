@@ -17,19 +17,36 @@ mod shader;
 use shader::Shader;
 
 use image::GenericImage;
+use image::ImageBuffer;
 
-// settings
-const SCR_WIDTH: u32 = 1024;
-const SCR_HEIGHT: u32 = 768;
+use std::fs;
+
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        println!("[ERROR] Call with texture name");
+        std::process::exit(1);
+    }
+
+    // let image = &args[1];
+    // println!("{}", args[1]);
+    let cube_image_name = &args[1];
+    let target_dir = format!("resources/textures/{}", cube_image_name);
+    fs::create_dir_all(target_dir);
+
+    let open_image_src = format!("resources/textures/{}.jpg", cube_image_name);
+    println!("{}", open_image_src);
+    
+    let img = image::open(&Path::new("resources/textures/cube.jpg")).expect("Failed to load texture");
+    let image_size: u32 = img.width() / 4 as u32;
+
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
     glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
-    // #[cfg(target_os = "macos")]
     glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
 
-    let (mut window, events) = glfw.create_window(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", glfw::WindowMode::Windowed)
+    let (mut window, events) = glfw.create_window(img.width(), img.height(), "LearnOpenGL", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window");
 
     window.make_current();
@@ -40,10 +57,10 @@ fn main() {
     // ---------------------------------------
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
-    let (ourShader, VBO, VAO, EBO, texture) = unsafe {
+    let (our_shader, vbo, vao, ebo, texture) = unsafe {
         // build and compile our shader program
         // ------------------------------------
-        let ourShader = Shader::new(
+        let our_shader = Shader::new(
             "src/shaders/shader.vert.glsl",
             "src/shaders/shader.frag.glsl");
 
@@ -61,20 +78,20 @@ fn main() {
             0, 1, 3,  // first Triangle
             1, 2, 3   // second Triangle
         ];
-        let (mut VBO, mut VAO, mut EBO) = (0, 0, 0);
-        gl::GenVertexArrays(1, &mut VAO);
-        gl::GenBuffers(1, &mut VBO);
-        gl::GenBuffers(1, &mut EBO);
+        let (mut vbo, mut vao, mut ebo) = (0, 0, 0);
+        gl::GenVertexArrays(1, &mut vao);
+        gl::GenBuffers(1, &mut vbo);
+        gl::GenBuffers(1, &mut ebo);
 
-        gl::BindVertexArray(VAO);
+        gl::BindVertexArray(vao);
 
-        gl::BindBuffer(gl::ARRAY_BUFFER, VBO);
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
         gl::BufferData(gl::ARRAY_BUFFER,
                        (vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
                        &vertices[0] as *const f32 as *const c_void,
                        gl::STATIC_DRAW);
 
-        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, EBO);
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
         gl::BufferData(gl::ELEMENT_ARRAY_BUFFER,
                        (indices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
                        &indices[0] as *const i32 as *const c_void,
@@ -103,28 +120,28 @@ fn main() {
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
         // load image, create texture and generate mipmaps
-        let img = image::open(&Path::new("resources/textures/figure-45.png")).expect("Failed to load texture");
+        
         let data = img.raw_pixels();
         gl::TexImage2D(gl::TEXTURE_2D,
                        0,
-                       gl::RGBA as i32,
+                       gl::RGB as i32,
                        img.width() as i32,
                        img.height() as i32,
                        0,
-                       gl::RGBA,
+                       gl::RGB,
                        gl::UNSIGNED_BYTE,
                        &data[0] as *const u8 as *const c_void);
-        println!("{}, {}", img.width(), img.height());
+        // println!("{}, {}", img.width(), img.height());
 
         gl::GenerateMipmap(gl::TEXTURE_2D);
 
-        (ourShader, VBO, VAO, EBO, texture)
+        (our_shader, vbo, vao, ebo, texture)
     };
 
     while !window.should_close() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
-            handle_window_event(&mut window, event);
+            handle_window_event(&mut window, event, image_size, cube_image_name);
         }
 
         // render
@@ -137,8 +154,8 @@ fn main() {
             gl::BindTexture(gl::TEXTURE_2D, texture);
 
             // render container
-            ourShader.useProgram();
-            gl::BindVertexArray(VAO);
+            our_shader.useProgram();
+            gl::BindVertexArray(vao);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
 
@@ -151,13 +168,13 @@ fn main() {
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
     unsafe {
-        gl::DeleteVertexArrays(1, &VAO);
-        gl::DeleteBuffers(1, &VBO);
-        gl::DeleteBuffers(1, &EBO);
+        gl::DeleteVertexArrays(1, &vao);
+        gl::DeleteBuffers(1, &vbo);
+        gl::DeleteBuffers(1, &ebo);
     }
 }
 
-fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
+fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent, img_size: u32, cube_image_name: &String ) {
     match event {
         glfw::WindowEvent::FramebufferSize(width, height) => {
                 // make sure the viewport matches the new window dimensions; note that width and
@@ -168,23 +185,39 @@ fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
             window.set_should_close(true)
         }
         glfw::WindowEvent::Key(Key::S, _, Action::Press, _) => {
-            // println!("save");
-            // let mut buffer: &[u8];
-            
+            println!("size: {}, {}", img_size, cube_image_name);
 
-            unsafe{
-                let mut pixels: Vec<u8> = Vec::new();
-                // let mut imgbuf = image::RgbImage::new(256, 256);
-                // let pixel = imgbuf.enumerate_pixels_mut();
-                // let data = img.raw_pixels();
-                gl::ReadPixels(0, 0, 1, 1, gl::RGB, gl::UNSIGNED_BYTE, *pixels as *mut c_void );
+            let target_dir = format!("resources/textures/{}", cube_image_name);
+            let image_names = vec!["negx", "posx", "negy", "posy", "negz", "posz"];
+
+            for i in 0..image_names.len() {
+                let image_src_name = format!("{}/{}.jpg", target_dir, image_names[i]);
+                println!("{}", image_src_name);
+
+                unsafe{
+
+                    let mut imgbuf: image::RgbImage = ImageBuffer::new(img_size as u32, img_size as u32);
+                    let imgbuf_ptr = imgbuf.as_mut_ptr();
+                    let mut x:u32 = 0;
+                    let mut y:u32 = 0;
+
+                    match i {
+                        0 => {x = 0; y = img_size;},
+                        1 => {x = img_size * 2; y = img_size;},
+                        2 => {x = img_size; y = img_size * 2;},
+                        3 => {x = img_size; y = 0;},
+                        4 => {x = img_size; y = img_size;},
+                        _ => {x = img_size * 3; y = img_size;},
+                    }
+
+                    gl::ReadPixels(x as GLint, y as GLint, img_size as GLint, img_size as GLint, gl::RGB, gl::UNSIGNED_BYTE, imgbuf_ptr as *mut c_void );
+
+                    imgbuf.save(image_src_name).unwrap();
+
+                }
             }
-        // let img = image::
-        // let data = img.raw_pixels();
-            // let img = image::open(&Path::new("resources/textures/figure-45.png")).expect("Failed to load texture");
-            // let data = img.raw_pixels();
+
             
-            // window.set_should_close(true)
         }
         _ => {}
     }
