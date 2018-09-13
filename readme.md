@@ -1,4 +1,4 @@
-#Rust Cube Map Slicer
+# Rust Cube Map Slicer
 
 ## Overview
 
